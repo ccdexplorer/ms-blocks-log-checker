@@ -30,7 +30,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: ccdexplorer/ms-new-modules
+          images: ccdexplorer/ms-blocks-log-checker
           tags: |
               type=ref,event=branch
               
