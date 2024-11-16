@@ -54,8 +54,12 @@ async def main():
                 await client.subscribe("ccdexplorer/+/heartbeat/#", qos=MQTT_QOS)
                 await client.subscribe("ccdexplorer/services/#", qos=MQTT_QOS)
                 async for message in client.messages:
+                    net = filter_net(message)
+                    msg = decode_to_json(message)
                     if message.topic.matches("ccdexplorer/services/blocks_log/restart"):
                         exit()
+                    if message.topic.matches("ccdexplorer/services/blocks_log/redo/#"):
+                        await subscriber.lookup_block_at_net(net, msg)
                     if message.topic.matches("ccdexplorer/services/cleanup"):
                         await subscriber.cleanup()
 

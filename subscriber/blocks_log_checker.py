@@ -1,10 +1,8 @@
 from ccdexplorer_fundamentals.enums import NET
-from ccdexplorer_fundamentals.GRPCClient import GRPCClient
 from ccdexplorer_fundamentals.mongodb import (
     Collections,
 )
-from ccdexplorer_fundamentals.tooter import Tooter
-from pymongo import DeleteOne, ReplaceOne
+from pymongo import ReplaceOne
 from pymongo.collection import Collection
 from rich.console import Console
 
@@ -238,6 +236,39 @@ class BlocksLogChecker(_utils):
 
         return block_ok, log
 
+    async def lookup_block_at_net(self, net: NET, block_height: int):
+
+        console.log(f"Running lookup_block_at_net for block {block_height} at {net}")
+        db: dict[Collections, Collection] = (
+            self.motor_mainnet if net == NET.MAINNET else self.motor_testnet
+        )
+        block_ok, log = await self.check_range(db, block_height, block_height + 1)
+        if not block_ok:
+            print(f"Repairing block {block_height:,.0f}. Reasons: {log[block_height]}")
+            tooter_message = f"{net.value}: Repairing block {block_height:,.0f}. Reasons: {log[block_height]}"
+            self.send_to_tooter(tooter_message)
+
+            current_result = await db[Collections.helpers].find_one(
+                {"_id": "special_purpose_block_request"}
+            )
+            current_list: list = current_result["heights"]
+            current_list.append(block_height)
+            current_list = list(set(current_list))
+
+            d = {
+                "_id": "special_purpose_block_request",
+                "heights": current_list,
+            }
+            _ = await db[Collections.helpers].bulk_write(
+                [
+                    ReplaceOne(
+                        {"_id": "special_purpose_block_request"},
+                        replacement=d,
+                        upsert=True,
+                    )
+                ]
+            )
+
     async def cleanup(self):
 
         for net in [NET.MAINNET]:
@@ -267,7 +298,7 @@ class BlocksLogChecker(_utils):
                         tooter_message = f"{net.value}: Repairing block {micro_step:,.0f}. Reasons: {log[micro_step]}"
                         self.send_to_tooter(tooter_message)
 
-                        current_result = db[Collections.helpers].find_one(
+                        current_result = await db[Collections.helpers].find_one(
                             {"_id": "special_purpose_block_request"}
                         )
                         current_list: list = current_result["heights"]
@@ -278,7 +309,7 @@ class BlocksLogChecker(_utils):
                             "_id": "special_purpose_block_request",
                             "heights": current_list,
                         }
-                        _ = db[Collections.helpers].bulk_write(
+                        _ = await db[Collections.helpers].bulk_write(
                             [
                                 ReplaceOne(
                                     {"_id": "special_purpose_block_request"},
