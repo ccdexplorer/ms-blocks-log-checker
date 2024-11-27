@@ -271,7 +271,7 @@ class BlocksLogChecker(_utils):
 
     async def cleanup(self):
 
-        for net in [NET.MAINNET]:
+        for net in NET:
             console.log(f"Running cleanup for {net}")
             db: dict[Collections, Collection] = (
                 self.motor_mainnet if net == NET.MAINNET else self.motor_testnet
